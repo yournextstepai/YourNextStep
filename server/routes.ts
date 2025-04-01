@@ -18,9 +18,11 @@ interface Request extends ExpressRequest {
 }
 
 // Utility function to safely access user
-function getUser(req: Request, res: Response): User | null {
+function getUser(req: Request, res: Response, sendResponse: boolean = true): User | null {
   if (!req.user) {
-    res.status(401).json({ message: "Unauthorized - User not found" });
+    if (sendResponse) {
+      res.status(401).json({ message: "Unauthorized - User not found" });
+    }
     return null;
   }
   return req.user;
@@ -406,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all community posts
   app.get("/api/community/posts", async (req: Request, res: Response) => {
     const posts = await storage.getCommunityPosts();
-    const currentUser = getUser(req, res);
+    const currentUser = getUser(req, res, false);
     
     // If user is logged in, check if they liked each post
     if (currentUser) {
@@ -437,7 +439,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Post not found" });
     }
     
-    const currentUser = getUser(req, res);
+    const currentUser = getUser(req, res, false);
     if (currentUser) {
       const postLike = await storage.getPostLike(post.id, currentUser.id);
       return res.status(200).json({
@@ -457,7 +459,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     const posts = await storage.getCommunityPostsByUser(userId);
-    const currentUser = getUser(req, res);
+    const currentUser = getUser(req, res, false);
     
     // If user is logged in, check if they liked each post
     if (currentUser) {
@@ -484,7 +486,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     const posts = await storage.getCommunityPostsByModule(moduleId);
-    const currentUser = getUser(req, res);
+    const currentUser = getUser(req, res, false);
     
     // If user is logged in, check if they liked each post
     if (currentUser) {
