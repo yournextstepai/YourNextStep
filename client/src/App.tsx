@@ -5,6 +5,7 @@ import { Toaster } from "@/components/ui/toaster";
 import NotFound from "@/pages/not-found";
 import Dashboard from "@/pages/Dashboard";
 import Curriculum from "@/pages/Curriculum";
+import ModuleDetail from "@/pages/ModuleDetail";
 import Chatbot from "@/pages/Chatbot";
 import Rewards from "@/pages/Rewards";
 import Referrals from "@/pages/Referrals";
@@ -69,6 +70,7 @@ function AppRoutes() {
       
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/curriculum" component={Curriculum} />
+      <Route path="/curriculum/:id" component={ModuleDetail} />
       <Route path="/chatbot" component={Chatbot} />
       <Route path="/rewards" component={Rewards} />
       <Route path="/referrals" component={Referrals} />
