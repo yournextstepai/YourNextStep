@@ -5,6 +5,7 @@ import { apiRequest } from "@/lib/queryClient";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { CommunityPost as BaseCommunityPost, CommunityComment, Module } from "@shared/schema";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -15,6 +16,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useToast } from "@/hooks/use-toast";
 import { useAuthContext } from "@/contexts/AuthContext";
 import { ThumbsUp, MessageSquare, Calendar, User, Book } from "lucide-react";
+
+// Extended interface for community posts with client-side properties
+interface CommunityPost extends BaseCommunityPost {
+  isLiked?: boolean;
+}
 
 const createPostSchema = z.object({
   title: z.string().min(3, "Title must be at least 3 characters").max(100, "Title must be at most 100 characters"),
@@ -33,24 +39,24 @@ export default function Community() {
   const [selectedPost, setSelectedPost] = useState<number | null>(null);
   
   // Get all posts
-  const { data: posts = [], isLoading: postsLoading } = useQuery({
+  const { data: posts = [], isLoading: postsLoading } = useQuery<CommunityPost[]>({
     queryKey: ["/api/community/posts"],
     enabled: selectedTab === "all"
   });
   
   // Get posts by the logged in user
-  const { data: userPosts = [], isLoading: userPostsLoading } = useQuery({
+  const { data: userPosts = [], isLoading: userPostsLoading } = useQuery<CommunityPost[]>({
     queryKey: ["/api/community/user", user?.id, "posts"],
     enabled: selectedTab === "my-posts" && !!user?.id
   });
   
   // Get all modules for the select dropdown
-  const { data: modules = [] } = useQuery({
+  const { data: modules = [] } = useQuery<Module[]>({
     queryKey: ["/api/modules"]
   });
   
   // Get comments for selected post
-  const { data: comments = [], isLoading: commentsLoading } = useQuery({
+  const { data: comments = [], isLoading: commentsLoading } = useQuery<CommunityComment[]>({
     queryKey: ["/api/community/posts", selectedPost, "comments"],
     enabled: !!selectedPost
   });
@@ -86,13 +92,33 @@ export default function Community() {
   const likePostMutation = useMutation({
     mutationFn: (postId: number) => 
       apiRequest(`/api/community/posts/${postId}/like`, "POST"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/community/posts"] });
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: ["/api/community/user", user.id, "posts"] });
-      }
-      if (selectedPost) {
-        queryClient.invalidateQueries({ queryKey: ["/api/community/posts", selectedPost] });
+    onSuccess: (data) => {
+      if (data?.post) {
+        // Direct update of the post in the cache
+        queryClient.setQueryData(["/api/community/posts"], (oldData: CommunityPost[] | undefined) => {
+          if (!oldData) return [];
+          return oldData.map(post => post.id === data.post.id ? data.post : post);
+        });
+        
+        if (user?.id) {
+          queryClient.setQueryData(["/api/community/user", user.id, "posts"], (oldData: CommunityPost[] | undefined) => {
+            if (!oldData) return [];
+            return oldData.map(post => post.id === data.post.id ? data.post : post);
+          });
+        }
+        
+        if (selectedPost && selectedPost === data.post.id) {
+          queryClient.setQueryData(["/api/community/posts", selectedPost], data.post);
+        }
+      } else {
+        // Fallback to invalidating queries if the response doesn't include the updated post
+        queryClient.invalidateQueries({ queryKey: ["/api/community/posts"] });
+        if (user?.id) {
+          queryClient.invalidateQueries({ queryKey: ["/api/community/user", user.id, "posts"] });
+        }
+        if (selectedPost) {
+          queryClient.invalidateQueries({ queryKey: ["/api/community/posts", selectedPost] });
+        }
       }
     }
   });
@@ -101,13 +127,33 @@ export default function Community() {
   const unlikePostMutation = useMutation({
     mutationFn: (postId: number) => 
       apiRequest(`/api/community/posts/${postId}/like`, "DELETE"),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["/api/community/posts"] });
-      if (user?.id) {
-        queryClient.invalidateQueries({ queryKey: ["/api/community/user", user.id, "posts"] });
-      }
-      if (selectedPost) {
-        queryClient.invalidateQueries({ queryKey: ["/api/community/posts", selectedPost] });
+    onSuccess: (data) => {
+      if (data?.post) {
+        // Direct update of the post in the cache
+        queryClient.setQueryData(["/api/community/posts"], (oldData: CommunityPost[] | undefined) => {
+          if (!oldData) return [];
+          return oldData.map(post => post.id === data.post.id ? data.post : post);
+        });
+        
+        if (user?.id) {
+          queryClient.setQueryData(["/api/community/user", user.id, "posts"], (oldData: CommunityPost[] | undefined) => {
+            if (!oldData) return [];
+            return oldData.map(post => post.id === data.post.id ? data.post : post);
+          });
+        }
+        
+        if (selectedPost && selectedPost === data.post.id) {
+          queryClient.setQueryData(["/api/community/posts", selectedPost], data.post);
+        }
+      } else {
+        // Fallback to invalidating queries if the response doesn't include the updated post
+        queryClient.invalidateQueries({ queryKey: ["/api/community/posts"] });
+        if (user?.id) {
+          queryClient.invalidateQueries({ queryKey: ["/api/community/user", user.id, "posts"] });
+        }
+        if (selectedPost) {
+          queryClient.invalidateQueries({ queryKey: ["/api/community/posts", selectedPost] });
+        }
       }
     }
   });
@@ -140,8 +186,8 @@ export default function Community() {
   
   const displayPosts = selectedTab === "all" ? posts : userPosts;
   
-  function formatDate(dateString: string) {
-    const date = new Date(dateString);
+  function formatDate(dateInput: string | Date) {
+    const date = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
     return date.toLocaleDateString('en-US', { 
       year: 'numeric', 
       month: 'short', 

@@ -29,7 +29,7 @@ export default function ChatInterface() {
   // Send message mutation
   const { mutate: sendMessage, isPending } = useMutation({
     mutationFn: async (message: string) => {
-      const response = await apiRequest("POST", "/api/chat/messages", { message });
+      const response = await apiRequest("/api/chat/messages", "POST", { message });
       return response.json();
     },
     onSuccess: () => {

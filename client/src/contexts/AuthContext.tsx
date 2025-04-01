@@ -45,7 +45,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (username: string, password: string): Promise<boolean> => {
     try {
-      const response = await apiRequest("POST", "/api/auth/login", { username, password });
+      const response = await apiRequest("/api/auth/login", "POST", { username, password });
       const userData = await response.json();
       setUser(userData);
       toast({
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = async (userData: any): Promise<boolean> => {
     try {
-      const response = await apiRequest("POST", "/api/auth/register", userData);
+      const response = await apiRequest("/api/auth/register", "POST", userData);
       const newUser = await response.json();
       setUser(newUser);
       toast({
@@ -87,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async (): Promise<void> => {
     try {
-      await apiRequest("POST", "/api/auth/logout", {});
+      await apiRequest("/api/auth/logout", "POST", {});
       setUser(null);
       toast({
         title: "Logged out",

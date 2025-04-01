@@ -20,7 +20,7 @@ export default function QuickChat() {
     setIsLoading(true);
     
     try {
-      const res = await apiRequest("POST", "/api/chat/messages", {
+      const res = await apiRequest("/api/chat/messages", "POST", {
         message: message.trim()
       });
       

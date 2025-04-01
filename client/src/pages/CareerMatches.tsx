@@ -6,6 +6,7 @@ import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
 import CareerCard from "@/components/career/CareerCard";
 import GenerateButton from "@/components/career/GenerateButton";
+import { CareerRecommendation } from "@shared/schema";
 
 export default function CareerMatches() {
   const queryClient = useQueryClient();
@@ -13,7 +14,7 @@ export default function CareerMatches() {
   const [isGenerating, setIsGenerating] = useState(false);
   
   // Fetch career recommendations
-  const { data: recommendations = [], isLoading } = useQuery({
+  const { data: recommendations = [], isLoading } = useQuery<CareerRecommendation[]>({
     queryKey: ["/api/career/recommendations"],
   });
   
@@ -21,7 +22,7 @@ export default function CareerMatches() {
   const { mutate: generateRecommendations, isPending } = useMutation({
     mutationFn: async () => {
       setIsGenerating(true);
-      const response = await apiRequest("POST", "/api/career/generate-recommendations", {});
+      const response = await apiRequest("/api/career/generate-recommendations", "POST", {});
       return response.json();
     },
     onSuccess: () => {
@@ -128,7 +129,7 @@ export default function CareerMatches() {
                 ))
               ) : recommendations.length > 0 ? (
                 // Recommendation cards
-                recommendations.map((career: any) => (
+                recommendations.map((career) => (
                   <CareerCard key={career.id} career={career} />
                 ))
               ) : (

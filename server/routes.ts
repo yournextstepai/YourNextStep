@@ -406,6 +406,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Get all community posts
   app.get("/api/community/posts", async (req: Request, res: Response) => {
     const posts = await storage.getCommunityPosts();
+    const currentUser = getUser(req, res);
+    
+    // If user is logged in, check if they liked each post
+    if (currentUser) {
+      const postsWithLikeStatus = await Promise.all(
+        posts.map(async (post) => {
+          const postLike = await storage.getPostLike(post.id, currentUser.id);
+          return {
+            ...post,
+            isLiked: !!postLike
+          };
+        })
+      );
+      return res.status(200).json(postsWithLikeStatus);
+    }
+    
     res.status(200).json(posts);
   });
   
@@ -421,6 +437,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(404).json({ message: "Post not found" });
     }
     
+    const currentUser = getUser(req, res);
+    if (currentUser) {
+      const postLike = await storage.getPostLike(post.id, currentUser.id);
+      return res.status(200).json({
+        ...post,
+        isLiked: !!postLike
+      });
+    }
+    
     res.status(200).json(post);
   });
   
@@ -432,6 +457,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     const posts = await storage.getCommunityPostsByUser(userId);
+    const currentUser = getUser(req, res);
+    
+    // If user is logged in, check if they liked each post
+    if (currentUser) {
+      const postsWithLikeStatus = await Promise.all(
+        posts.map(async (post) => {
+          const postLike = await storage.getPostLike(post.id, currentUser.id);
+          return {
+            ...post,
+            isLiked: !!postLike
+          };
+        })
+      );
+      return res.status(200).json(postsWithLikeStatus);
+    }
+    
     res.status(200).json(posts);
   });
   
@@ -443,6 +484,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
     
     const posts = await storage.getCommunityPostsByModule(moduleId);
+    const currentUser = getUser(req, res);
+    
+    // If user is logged in, check if they liked each post
+    if (currentUser) {
+      const postsWithLikeStatus = await Promise.all(
+        posts.map(async (post) => {
+          const postLike = await storage.getPostLike(post.id, currentUser.id);
+          return {
+            ...post,
+            isLiked: !!postLike
+          };
+        })
+      );
+      return res.status(200).json(postsWithLikeStatus);
+    }
+    
     res.status(200).json(posts);
   });
   
@@ -472,9 +529,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(post);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const validationError = new ValidationError(error).message;
         return res.status(400).json({ 
           message: "Invalid post data", 
-          errors: ValidationError.fromZodError(error).message 
+          errors: validationError 
         });
       }
       res.status(500).json({ message: "Failed to create post" });
@@ -527,9 +585,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.status(201).json(comment);
     } catch (error) {
       if (error instanceof z.ZodError) {
+        const validationError = new ValidationError(error).message;
         return res.status(400).json({ 
           message: "Invalid comment data", 
-          errors: ValidationError.fromZodError(error).message 
+          errors: validationError 
         });
       }
       res.status(500).json({ message: "Failed to create comment" });
@@ -563,7 +622,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         userId: user.id
       });
       
-      res.status(201).json({ success: true, like: postLike });
+      // Increment the like count by updating the post
+      await storage.updateCommunityPostLikeCount(postId, 1);
+      
+      // Get the updated post
+      const updatedPost = await storage.getCommunityPost(postId);
+      
+      res.status(201).json({ 
+        success: true, 
+        post: {
+          ...updatedPost,
+          isLiked: true
+        } 
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to like post" });
     }
@@ -592,7 +663,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     try {
       await storage.deletePostLike(postId, user.id);
-      res.status(200).json({ success: true });
+      
+      // Decrement the like count by updating the post
+      await storage.updateCommunityPostLikeCount(postId, -1);
+      
+      // Get the updated post
+      const updatedPost = await storage.getCommunityPost(postId);
+      
+      res.status(200).json({ 
+        success: true, 
+        post: {
+          ...updatedPost,
+          isLiked: false
+        } 
+      });
     } catch (error) {
       res.status(500).json({ message: "Failed to unlike post" });
     }
