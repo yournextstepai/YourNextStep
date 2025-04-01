@@ -167,6 +167,17 @@ export default function Community() {
         queryClient.invalidateQueries({ queryKey: ["/api/community/posts", selectedPost, "comments"] });
       }
       setCommentContent("");
+      toast({
+        title: "Comment added",
+        description: "Your comment has been posted successfully."
+      });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Error",
+        description: error.message || "Failed to add comment. Please try again.",
+        variant: "destructive"
+      });
     }
   });
   
