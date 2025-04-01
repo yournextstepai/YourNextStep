@@ -1,4 +1,4 @@
-import type { Express, Response } from "express";
+import type { Express, Response, Request as ExpressRequest } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -11,8 +11,19 @@ import { generateAIResponse } from "./openai";
 import bcrypt from "bcryptjs";
 import crypto from "crypto";
 
-// Use any for request to avoid TypeScript errors
-type Request = any;
+// Define Request interface that extends ExpressRequest
+interface Request extends ExpressRequest {
+  user?: User;
+}
+
+// Utility function to safely access user
+function getUser(req: Request, res: Response): User | null {
+  if (!req.user) {
+    res.status(401).json({ message: "Unauthorized - User not found" });
+    return null;
+  }
+  return req.user;
+}
 
 const COOKIE_NAME = "auth_token";
 const COOKIE_OPTIONS = {
@@ -46,7 +57,6 @@ const authMiddleware = async (req: Request, res: Response, next: Function) => {
   next();
 };
 
-// @ts-ignore - Ignoring TypeScript errors for now
 export async function registerRoutes(app: Express): Promise<Server> {
   // Authentication routes
   app.post("/api/auth/register", async (req: Request, res: Response) => {
@@ -163,22 +173,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   app.get("/api/auth/me", authMiddleware, async (req: Request, res: Response) => {
-    const { password, ...userWithoutPassword } = req.user;
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const { password, ...userWithoutPassword } = user;
     res.status(200).json(userWithoutPassword);
   });
   
   // User progress routes
   app.get("/api/user/progress", authMiddleware, async (req: Request, res: Response) => {
-    const userId = req.user.id;
-    const progress = await storage.getUserProgress(userId);
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const progress = await storage.getUserProgress(user.id);
     res.status(200).json(progress);
   });
   
   app.post("/api/user/progress", authMiddleware, async (req: Request, res: Response) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    
     try {
       const progressSchema = insertUserProgressSchema.parse({
         ...req.body,
-        userId: req.user.id,
+        userId: user.id,
       });
       
       const module = await storage.getModule(progressSchema.moduleId);
@@ -186,7 +204,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Module not found" });
       }
       
-      /* @ts-ignore */
       const progress = await storage.updateUserProgress(
         progressSchema.userId,
         progressSchema.moduleId,
@@ -195,13 +212,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // If module completed, award points
       if (progressSchema.progress === 100 && progressSchema.isCompleted) {
-        await storage.updateUserPoints(req.user.id, module.points);
+        await storage.updateUserPoints(user.id, module.points);
         
         // Check for achievements that can be unlocked
         const achievements = await storage.getAchievements();
         for (const achievement of achievements) {
           if (achievement.requirement.includes(module.title)) {
-            await storage.unlockAchievement(req.user.id, achievement.id);
+            await storage.unlockAchievement(user.id, achievement.id);
           }
         }
       }
@@ -247,10 +264,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.status(200).json(achievements);
   });
   
-  // @ts-ignore - Ignoring the req.user error
   app.get("/api/user/achievements", authMiddleware, async (req: Request, res: Response) => {
-    const userId = req.user.id;
-    const achievements = await storage.getUserAchievements(userId);
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const achievements = await storage.getUserAchievements(user.id);
     res.status(200).json(achievements);
   });
   
@@ -261,26 +279,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Chat routes
-  // @ts-ignore
   app.get("/api/chat/messages", authMiddleware, async (req: Request, res: Response) => {
-    const userId = req.user.id;
-    const messages = await storage.getChatMessages(userId);
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const messages = await storage.getChatMessages(user.id);
     res.status(200).json(messages);
   });
   
-  // @ts-ignore
   app.post("/api/chat/messages", authMiddleware, async (req: Request, res: Response) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    
     try {
       const messageSchema = insertChatMessageSchema.parse({
         ...req.body,
-        userId: req.user.id,
+        userId: user.id,
         isFromUser: true,
       });
       
       const userMessage = await storage.createChatMessage(messageSchema);
       
       // Get previous messages for context (up to 10)
-      const previousMessages = await storage.getChatMessages(req.user.id);
+      const previousMessages = await storage.getChatMessages(user.id);
       const recentMessages = previousMessages.slice(-10);
       
       // Generate AI response using OpenAI
@@ -288,7 +309,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Save AI response
       const botMessage = await storage.createChatMessage({
-        userId: req.user.id,
+        userId: user.id,
         message: aiResponse,
         isFromUser: false,
       });
@@ -303,20 +324,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Career recommendations
-  // @ts-ignore
   app.get("/api/career/recommendations", authMiddleware, async (req: Request, res: Response) => {
-    const userId = req.user.id;
-    const recommendations = await storage.getCareerRecommendations(userId);
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const recommendations = await storage.getCareerRecommendations(user.id);
     res.status(200).json(recommendations);
   });
   
   // Generate career recommendations
-  // @ts-ignore
   app.post("/api/career/generate-recommendations", authMiddleware, async (req: Request, res: Response) => {
-    const userId = req.user.id;
+    const user = getUser(req, res);
+    if (!user) return;
     
     // Check if user has completed enough modules
-    const userProgress = await storage.getUserProgress(userId);
+    const userProgress = await storage.getUserProgress(user.id);
     const completedModules = userProgress.filter(p => p.isCompleted);
     
     if (completedModules.length < 3) {
@@ -329,7 +351,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate recommendations based on completed modules
       const recommendations = [
         {
-          userId,
+          userId: user.id,
           title: "Software Developer",
           description: "Design, build, and maintain software applications",
           matchScore: 85,
@@ -338,7 +360,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eduRequirements: "Bachelor's degree in Computer Science or related field"
         },
         {
-          userId,
+          userId: user.id,
           title: "UX/UI Designer",
           description: "Create user-friendly interfaces and improve user experience",
           matchScore: 78,
@@ -347,7 +369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           eduRequirements: "Bachelor's degree in Design or related field"
         },
         {
-          userId,
+          userId: user.id,
           title: "Data Scientist",
           description: "Analyze data to help organizations make better decisions",
           matchScore: 70,
@@ -371,10 +393,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Referral routes
-  // @ts-ignore
   app.get("/api/referrals", authMiddleware, async (req: Request, res: Response) => {
-    const userId = req.user.id;
-    const referrals = await storage.getReferrals(userId);
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const referrals = await storage.getReferrals(user.id);
     res.status(200).json(referrals);
   });
   

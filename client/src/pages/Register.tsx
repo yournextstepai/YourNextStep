@@ -91,10 +91,8 @@ export default function Register() {
             </div>
 
             <div className="mt-6">
-              <Link href="/login">
-                <a className="w-full flex justify-center py-2 px-4 border border-primary rounded-md shadow-sm text-sm font-medium text-primary bg-white hover:bg-gray-50">
-                  Sign in instead
-                </a>
+              <Link href="/login" className="w-full flex justify-center py-2 px-4 border border-primary rounded-md shadow-sm text-sm font-medium text-primary bg-white hover:bg-gray-50">
+                Sign in instead
               </Link>
             </div>
           </div>

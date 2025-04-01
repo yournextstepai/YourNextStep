@@ -196,9 +196,9 @@ export default function AuthForm({ type, onSubmit, loading, referralCode }: Auth
           </div>
 
           <div className="text-sm">
-            <a href="#" className="font-medium text-primary hover:text-primary/80">
+            <button type="button" className="font-medium text-primary hover:text-primary/80">
               Forgot your password?
-            </a>
+            </button>
           </div>
         </div>
       )}

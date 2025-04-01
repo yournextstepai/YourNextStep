@@ -57,10 +57,8 @@ export default function Login() {
             </div>
 
             <div className="mt-6">
-              <Link href="/register">
-                <a className="w-full flex justify-center py-2 px-4 border border-primary rounded-md shadow-sm text-sm font-medium text-primary bg-white hover:bg-gray-50">
-                  Create an account
-                </a>
+              <Link href="/register" className="w-full flex justify-center py-2 px-4 border border-primary rounded-md shadow-sm text-sm font-medium text-primary bg-white hover:bg-gray-50">
+                Create an account
               </Link>
             </div>
           </div>
