@@ -8,7 +8,10 @@ import {
   ChatMessage, InsertChatMessage,
   CareerRecommendation, InsertCareerRecommendation,
   Session, InsertSession,
-  Referral, InsertReferral
+  Referral, InsertReferral,
+  CommunityPost, InsertCommunityPost,
+  CommunityComment, InsertCommunityComment,
+  PostLike, InsertPostLike
 } from "@shared/schema";
 import { randomBytes } from "crypto";
 
@@ -61,6 +64,23 @@ export interface IStorage {
   // Referrals
   createReferral(referral: InsertReferral): Promise<Referral>;
   getReferrals(userId: number): Promise<Referral[]>;
+
+  // Community Posts
+  getCommunityPosts(): Promise<CommunityPost[]>;
+  getCommunityPostsByUser(userId: number): Promise<CommunityPost[]>;
+  getCommunityPostsByModule(moduleId: number): Promise<CommunityPost[]>;
+  getCommunityPost(id: number): Promise<CommunityPost | undefined>;
+  createCommunityPost(post: InsertCommunityPost): Promise<CommunityPost>;
+  updateCommunityPostLikeCount(postId: number, incrementBy: number): Promise<CommunityPost | undefined>;
+
+  // Community Comments
+  getCommunityComments(postId: number): Promise<CommunityComment[]>;
+  createCommunityComment(comment: InsertCommunityComment): Promise<CommunityComment>;
+
+  // Post Likes
+  getPostLike(postId: number, userId: number): Promise<PostLike | undefined>;
+  createPostLike(like: InsertPostLike): Promise<PostLike>;
+  deletePostLike(postId: number, userId: number): Promise<void>;
 }
 
 export class MemStorage implements IStorage {
@@ -74,6 +94,9 @@ export class MemStorage implements IStorage {
   private careerRecommendations: Map<number, CareerRecommendation>;
   private sessions: Map<string, Session>;
   private referrals: Map<number, Referral>;
+  private communityPosts: Map<number, CommunityPost>;
+  private communityComments: Map<number, CommunityComment>;
+  private postLikes: Map<string, PostLike>;
 
   private currentUserId: number;
   private currentModuleId: number;
@@ -85,6 +108,9 @@ export class MemStorage implements IStorage {
   private currentCareerRecommendationId: number;
   private currentSessionId: number;
   private currentReferralId: number;
+  private currentCommunityPostId: number;
+  private currentCommunityCommentId: number;
+  private currentPostLikeId: number;
 
   constructor() {
     this.users = new Map();
@@ -97,6 +123,9 @@ export class MemStorage implements IStorage {
     this.careerRecommendations = new Map();
     this.sessions = new Map();
     this.referrals = new Map();
+    this.communityPosts = new Map();
+    this.communityComments = new Map();
+    this.postLikes = new Map();
 
     this.currentUserId = 1;
     this.currentModuleId = 1;
@@ -108,6 +137,9 @@ export class MemStorage implements IStorage {
     this.currentCareerRecommendationId = 1;
     this.currentSessionId = 1;
     this.currentReferralId = 1;
+    this.currentCommunityPostId = 1;
+    this.currentCommunityCommentId = 1;
+    this.currentPostLikeId = 1;
 
     // Initialize with sample data
     this.initSampleData();
@@ -514,6 +546,116 @@ export class MemStorage implements IStorage {
   async getReferrals(userId: number): Promise<Referral[]> {
     return Array.from(this.referrals.values())
       .filter(referral => referral.referrerUserId === userId);
+  }
+
+  // Community Posts
+  async getCommunityPosts(): Promise<CommunityPost[]> {
+    return Array.from(this.communityPosts.values())
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getCommunityPostsByUser(userId: number): Promise<CommunityPost[]> {
+    return Array.from(this.communityPosts.values())
+      .filter(post => post.userId === userId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getCommunityPostsByModule(moduleId: number): Promise<CommunityPost[]> {
+    return Array.from(this.communityPosts.values())
+      .filter(post => post.moduleId === moduleId)
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  }
+
+  async getCommunityPost(id: number): Promise<CommunityPost | undefined> {
+    return this.communityPosts.get(id);
+  }
+
+  async createCommunityPost(insertCommunityPost: InsertCommunityPost): Promise<CommunityPost> {
+    const id = this.currentCommunityPostId++;
+    const now = new Date();
+    
+    const communityPost: CommunityPost = {
+      ...insertCommunityPost,
+      id,
+      likesCount: 0,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.communityPosts.set(id, communityPost);
+    return communityPost;
+  }
+
+  async updateCommunityPostLikeCount(postId: number, incrementBy: number): Promise<CommunityPost | undefined> {
+    const post = this.communityPosts.get(postId);
+    if (!post) return undefined;
+    
+    const updatedPost: CommunityPost = {
+      ...post,
+      likesCount: post.likesCount + incrementBy,
+      updatedAt: new Date()
+    };
+    
+    this.communityPosts.set(postId, updatedPost);
+    return updatedPost;
+  }
+
+  // Community Comments
+  async getCommunityComments(postId: number): Promise<CommunityComment[]> {
+    return Array.from(this.communityComments.values())
+      .filter(comment => comment.postId === postId)
+      .sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+  }
+
+  async createCommunityComment(insertCommunityComment: InsertCommunityComment): Promise<CommunityComment> {
+    const id = this.currentCommunityCommentId++;
+    const now = new Date();
+    
+    const communityComment: CommunityComment = {
+      ...insertCommunityComment,
+      id,
+      createdAt: now,
+      updatedAt: now
+    };
+    
+    this.communityComments.set(id, communityComment);
+    return communityComment;
+  }
+
+  // Post Likes
+  async getPostLike(postId: number, userId: number): Promise<PostLike | undefined> {
+    const key = `${postId}-${userId}`;
+    return this.postLikes.get(key);
+  }
+
+  async createPostLike(insertPostLike: InsertPostLike): Promise<PostLike> {
+    const id = this.currentPostLikeId++;
+    const key = `${insertPostLike.postId}-${insertPostLike.userId}`;
+    
+    const postLike: PostLike = {
+      ...insertPostLike,
+      id,
+      createdAt: new Date()
+    };
+    
+    this.postLikes.set(key, postLike);
+    
+    // Update post like count
+    await this.updateCommunityPostLikeCount(insertPostLike.postId, 1);
+    
+    return postLike;
+  }
+
+  async deletePostLike(postId: number, userId: number): Promise<void> {
+    const key = `${postId}-${userId}`;
+    const exists = this.postLikes.has(key);
+    
+    if (exists) {
+      this.postLikes.delete(key);
+      
+      // Update post like count
+      await this.updateCommunityPostLikeCount(postId, -1);
+    }
   }
 }
 

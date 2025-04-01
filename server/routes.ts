@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
   insertUserSchema, insertChatMessageSchema, insertUserProgressSchema,
+  insertCommunityPostSchema, insertCommunityCommentSchema, insertPostLikeSchema,
   User
 } from "@shared/schema";
 import { z } from "zod";
@@ -399,6 +400,202 @@ export async function registerRoutes(app: Express): Promise<Server> {
     
     const referrals = await storage.getReferrals(user.id);
     res.status(200).json(referrals);
+  });
+  
+  // Community routes
+  // Get all community posts
+  app.get("/api/community/posts", async (req: Request, res: Response) => {
+    const posts = await storage.getCommunityPosts();
+    res.status(200).json(posts);
+  });
+  
+  // Get a single community post
+  app.get("/api/community/posts/:id", async (req: Request, res: Response) => {
+    const id = parseInt(req.params.id);
+    if (isNaN(id)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+    
+    const post = await storage.getCommunityPost(id);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    res.status(200).json(post);
+  });
+  
+  // Get posts by user
+  app.get("/api/community/user/:userId/posts", async (req: Request, res: Response) => {
+    const userId = parseInt(req.params.userId);
+    if (isNaN(userId)) {
+      return res.status(400).json({ message: "Invalid user ID" });
+    }
+    
+    const posts = await storage.getCommunityPostsByUser(userId);
+    res.status(200).json(posts);
+  });
+  
+  // Get posts by module
+  app.get("/api/community/module/:moduleId/posts", async (req: Request, res: Response) => {
+    const moduleId = parseInt(req.params.moduleId);
+    if (isNaN(moduleId)) {
+      return res.status(400).json({ message: "Invalid module ID" });
+    }
+    
+    const posts = await storage.getCommunityPostsByModule(moduleId);
+    res.status(200).json(posts);
+  });
+  
+  // Create a community post
+  app.post("/api/community/posts", authMiddleware, async (req: Request, res: Response) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    try {
+      const postData = insertCommunityPostSchema.parse({
+        ...req.body,
+        userId: user.id
+      });
+      
+      if (postData.moduleId) {
+        const module = await storage.getModule(postData.moduleId);
+        if (!module) {
+          return res.status(404).json({ message: "Module not found" });
+        }
+      }
+      
+      const post = await storage.createCommunityPost(postData);
+      
+      // Award points for creating a post
+      await storage.updateUserPoints(user.id, 10);
+      
+      res.status(201).json(post);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid post data", 
+          errors: ValidationError.fromZodError(error).message 
+        });
+      }
+      res.status(500).json({ message: "Failed to create post" });
+    }
+  });
+  
+  // Get comments for a post
+  app.get("/api/community/posts/:postId/comments", async (req: Request, res: Response) => {
+    const postId = parseInt(req.params.postId);
+    if (isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+    
+    const post = await storage.getCommunityPost(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    const comments = await storage.getCommunityComments(postId);
+    res.status(200).json(comments);
+  });
+  
+  // Add a comment to a post
+  app.post("/api/community/posts/:postId/comments", authMiddleware, async (req: Request, res: Response) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const postId = parseInt(req.params.postId);
+    if (isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+    
+    const post = await storage.getCommunityPost(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    try {
+      const commentData = insertCommunityCommentSchema.parse({
+        ...req.body,
+        postId,
+        userId: user.id
+      });
+      
+      const comment = await storage.createCommunityComment(commentData);
+      
+      // Award points for commenting
+      await storage.updateUserPoints(user.id, 5);
+      
+      res.status(201).json(comment);
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ 
+          message: "Invalid comment data", 
+          errors: ValidationError.fromZodError(error).message 
+        });
+      }
+      res.status(500).json({ message: "Failed to create comment" });
+    }
+  });
+  
+  // Like a post
+  app.post("/api/community/posts/:postId/like", authMiddleware, async (req: Request, res: Response) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const postId = parseInt(req.params.postId);
+    if (isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+    
+    const post = await storage.getCommunityPost(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // Check if user already liked the post
+    const existingLike = await storage.getPostLike(postId, user.id);
+    if (existingLike) {
+      return res.status(400).json({ message: "You've already liked this post" });
+    }
+    
+    try {
+      const postLike = await storage.createPostLike({
+        postId,
+        userId: user.id
+      });
+      
+      res.status(201).json({ success: true, like: postLike });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to like post" });
+    }
+  });
+  
+  // Unlike a post
+  app.delete("/api/community/posts/:postId/like", authMiddleware, async (req: Request, res: Response) => {
+    const user = getUser(req, res);
+    if (!user) return;
+    
+    const postId = parseInt(req.params.postId);
+    if (isNaN(postId)) {
+      return res.status(400).json({ message: "Invalid post ID" });
+    }
+    
+    const post = await storage.getCommunityPost(postId);
+    if (!post) {
+      return res.status(404).json({ message: "Post not found" });
+    }
+    
+    // Check if user already liked the post
+    const existingLike = await storage.getPostLike(postId, user.id);
+    if (!existingLike) {
+      return res.status(400).json({ message: "You haven't liked this post yet" });
+    }
+    
+    try {
+      await storage.deletePostLike(postId, user.id);
+      res.status(200).json({ success: true });
+    } catch (error) {
+      res.status(500).json({ message: "Failed to unlike post" });
+    }
   });
   
   const httpServer = createServer(app);

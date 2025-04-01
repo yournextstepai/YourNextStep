@@ -10,6 +10,7 @@ import Rewards from "@/pages/Rewards";
 import Referrals from "@/pages/Referrals";
 import CareerMatches from "@/pages/CareerMatches";
 import Profile from "@/pages/Profile";
+import Community from "@/pages/Community";
 import Login from "@/pages/Login";
 import Register from "@/pages/Register";
 import { AuthProvider } from "./contexts/AuthContext";
@@ -20,7 +21,7 @@ import MobileNav from "./components/layout/MobileNav";
 import TopNav from "./components/layout/TopNav";
 
 // Protected route component
-function ProtectedRoute({ component: Component, ...rest }: { component: React.ComponentType, path: string }) {
+function ProtectedRoute({ component: Component }: { component: React.ComponentType<any> }) {
   const { isAuthenticated, isLoading } = useAuth();
   
   if (isLoading) {
@@ -32,7 +33,7 @@ function ProtectedRoute({ component: Component, ...rest }: { component: React.Co
     return null;
   }
   
-  return <Component {...rest} />;
+  return <Component />;
 }
 
 function AppLayout({ children }: { children: React.ReactNode }) {
@@ -72,6 +73,7 @@ function AppRoutes() {
       <Route path="/rewards" component={Rewards} />
       <Route path="/referrals" component={Referrals} />
       <Route path="/career" component={CareerMatches} />
+      <Route path="/community" component={Community} />
       <Route path="/profile" component={Profile} />
       
       <Route component={NotFound} />

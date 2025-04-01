@@ -10,6 +10,7 @@ export default function Sidebar() {
     { path: "/dashboard", label: "Dashboard", icon: "home" },
     { path: "/curriculum", label: "Curriculum", icon: "book" },
     { path: "/chatbot", label: "Ara Chatbot", icon: "comment-dots" },
+    { path: "/community", label: "Community", icon: "users" },
     { path: "/rewards", label: "Rewards & Scholarships", icon: "trophy" },
     { path: "/referrals", label: "Referrals", icon: "share-alt" },
     { path: "/career", label: "Career Matches", icon: "briefcase" },

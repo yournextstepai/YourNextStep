@@ -8,7 +8,7 @@ export default function MobileNav() {
     { path: "/dashboard", label: "Home", icon: "home" },
     { path: "/curriculum", label: "Learn", icon: "book" },
     { path: "/chatbot", label: "Ara", icon: "comment-dots" },
-    { path: "/rewards", label: "Rewards", icon: "trophy" },
+    { path: "/community", label: "Community", icon: "users" },
     { path: "/profile", label: "Profile", icon: "user" },
   ];
   
